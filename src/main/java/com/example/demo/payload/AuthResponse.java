@@ -1,34 +1,47 @@
 package com.example.demo.payload;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AuthResponse {
+
     private String token;
     private String message;
 
-    // Empty constructor (required by Spring)
+    // Default constructor
     public AuthResponse() {}
 
-    // ✅ Factory method for token response
-    public static AuthResponse withToken(String token) {
-        AuthResponse response = new AuthResponse();
-        response.token = token;
-        return response;
+    // Constructor with both fields
+    public AuthResponse(String token, String message) {
+        this.token = token;
+        this.message = message;
     }
 
-    // ✅ Factory method for message response
+    // Constructor with only message
+    public AuthResponse(String message) {
+        this.message = message;
+    }
+
+    // Static helper methods for convenience
+    public static AuthResponse withToken(String token, String message) {
+        return new AuthResponse(token, message);
+    }
+
     public static AuthResponse withMessage(String message) {
-        AuthResponse response = new AuthResponse();
-        response.message = message;
-        return response;
+        return new AuthResponse(null, message);
     }
 
+    // Getters and setters
     public String getToken() {
         return token;
     }
 
+    public void setToken(String token) {
+        this.token = token;
+    }
+
     public String getMessage() {
         return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }

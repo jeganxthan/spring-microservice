@@ -66,7 +66,7 @@ public class AuthService {
         // Set TTL = 1 minute to limit requests
         redisTemplate.opsForValue().set(rateLimitKey, "sent", Duration.ofMinutes(1));
 
-        return AuthResponse.withMessage("OTP sent to " + request.getEmail());
+        return new AuthResponse(null, "OTP sent to " + request.getEmail());
     }
 
     // ✅ Step 2: Verify OTP and register user
@@ -87,7 +87,8 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtService.generateToken(user);
-        return AuthResponse.withToken(token);
+
+        return AuthResponse.withToken(token, "Registration successful");
     }
 
     // ✅ Step 3: Login
@@ -103,7 +104,7 @@ public class AuthService {
                         request.getPassword()));
 
         String token = jwtService.generateToken(existingUser);
-        return AuthResponse.withToken(token);
+        return AuthResponse.withToken(token, "Login successful");
 
     }
 }
