@@ -40,10 +40,9 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.2</version>
             <scope>runtime</scope>
         </dependency>
-
+        
 
         <!-- JWT (JSON Web Token) -->
         <dependency>
@@ -91,10 +90,10 @@
         </dependency>
 
         <!-- Mail -->
-            <dependency>
-              <groupId>org.springframework.boot</groupId>
-              <artifactId>spring-boot-starter-mail</artifactId>
-            </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
 
         <!-- Thymeleaf templates -->
         <dependency>
@@ -110,13 +109,34 @@
 
         <!-- dotenv -->
         <dependency>
-  <groupId>me.paulschwarz</groupId>
-  <artifactId>spring-dotenv</artifactId>
-  <version>3.0.0</version>
-</dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>3.0.0</version>
+        </dependency>
 
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.8</version> <!-- You can use the latest version here -->
+        </dependency>
+
+        <!-- JDBC -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
 
     </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Optionally specify versions for libraries you want to manage -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.15.2</version> <!-- Example version -->
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
