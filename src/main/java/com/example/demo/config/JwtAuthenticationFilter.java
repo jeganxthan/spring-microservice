@@ -17,6 +17,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+/**
+ * Robust JwtAuthenticationFilter:
+ *  - uses shouldNotFilter to skip public endpoints (handles contextPath and servletPath)
+ *  - prints minimal debug lines to the console for verification
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -26,53 +31,78 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
-    // 🔥 NEW: Skip JWT filter for these endpoints
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String path = request.getRequestURI();
+        // Normalize path pieces so matching is robust
+        String context = safe(request.getContextPath());   // often "", but may be "/app"
+        String uri = safe(request.getRequestURI());        // full URI including context path
+        String servlet = safe(request.getServletPath());   // path within app
 
-        // Public endpoints (no JWT required)
-        if (path.startsWith("/api/shows/")) return true;
-        if (path.startsWith("/api/auth/")) return true;
-
-        // Static resources
-        if (path.startsWith("/static/") || path.startsWith("/favicon") || path.startsWith("/actuator")) {
-            return true;
+        // canonical path to match against (servletPath is easiest)
+        String pathToCheck = servlet;
+        if (pathToCheck == null || pathToCheck.isEmpty()) {
+            pathToCheck = uri;
+            if (context != null && !context.isEmpty() && pathToCheck.startsWith(context)) {
+                pathToCheck = pathToCheck.substring(context.length());
+            }
         }
 
-        return false; // everything else requires authentication
+        // Normalize multiple slashes
+        pathToCheck = pathToCheck.replaceAll("/{2,}", "/");
+
+        // Public endpoints that do NOT require JWT
+        if (pathToCheck.startsWith("/api/shows/") || pathToCheck.equals("/api/shows")) return true;
+        if (pathToCheck.startsWith("/api/auth/") || pathToCheck.equals("/api/auth")) return true;
+        if (pathToCheck.startsWith("/static/") || pathToCheck.startsWith("/actuator") || pathToCheck.startsWith("/favicon")) return true;
+
+        return false;
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        String reqPath = request.getRequestURI();
+        // debug line - shows whether filter is active for this request
+        System.out.println("[JWT-FILTER] requestURI=" + reqPath + " | shouldNotFilter=" + shouldNotFilter(request));
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // no token - just continue (if endpoint allowed, request will succeed; otherwise Security will handle)
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        final String jwt = authHeader.substring(7);
+        String userEmail;
+        try {
+            userEmail = jwtService.extractUsername(jwt);
+        } catch (Exception ex) {
+            System.err.println("[JWT-FILTER] token parse failed: " + ex.getMessage());
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            try {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    System.out.println("[JWT-FILTER] authenticated user=" + userEmail);
+                } else {
+                    System.out.println("[JWT-FILTER] token invalid for user=" + userEmail);
+                }
+            } catch (Exception e) {
+                System.err.println("[JWT-FILTER] auth error for " + userEmail + ": " + e.getMessage());
+                // continue, don't throw — Security will deny where needed
             }
         }
 

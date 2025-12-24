@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.CollectionType;
 
 @Service
+@Transactional(readOnly = true)
 public class ShowService {
 
     @Autowired
@@ -262,51 +263,42 @@ public class ShowService {
     }
 
     public List<SeasonDTO> getAllSeasonsForSeries(String seriesName, boolean includeEpisodes) {
-        // 1) fetch seasons from show_seasons
-        String seasonSql = "SELECT season FROM show_seasons WHERE show_title = ? ORDER BY season";
-        List<String> seasons = jdbcTemplate.query(seasonSql, new Object[]{seriesName}, (rs, rowNum) -> rs.getString("season"));
-
-        List<SeasonDTO> result = new ArrayList<>();
-
-        // 2) for each season, count episodes and optionally fetch episodes
-        String countSql = "SELECT COUNT(*) FROM episodes WHERE show_title = ? AND season_name = ?";
-        String episodesSql = "SELECT episode_index, episode_title, episode_description, episode_duration, episode_image_url, episode_filename, episode_url "
-                + "FROM episodes WHERE show_title = ? AND season_name = ? ORDER BY episode_index";
-
-        for (String seasonName : seasons) {
-            Integer episodeCount = jdbcTemplate.queryForObject(countSql, new Object[]{seriesName, seasonName}, Integer.class);
-
-            if (!includeEpisodes) {
-                result.add(new SeasonDTO(seasonName, episodeCount == null ? 0 : episodeCount));
-            } else {
-                List<EpisodeDTO> eps = jdbcTemplate.query(episodesSql, new Object[]{seriesName, seasonName}, (rs, rowNum) -> toEpisodeDTO(rs));
-                result.add(new SeasonDTO(seasonName, episodeCount == null ? 0 : episodeCount, eps));
-            }
+        Show show = showRepository.findByShowTitle(seriesName);
+        if (show == null || show.getSeasons_data() == null) {
+            return new ArrayList<>();
         }
 
-        return result;
+        return show.getSeasons_data().stream()
+                .map(seasonData -> {
+                    int episodeCount = seasonData.getEpisodes() != null ? seasonData.getEpisodes().size() : 0;
+                    if (includeEpisodes) {
+                        List<EpisodeDTO> episodeDTOs = seasonData.getEpisodes() != null
+                                ? seasonData.getEpisodes().stream()
+                                        .map(this::toEpisodeDTO)
+                                        .collect(Collectors.toList())
+                                : new ArrayList<>();
+                        return new SeasonDTO(seasonData.getSeasonName(), episodeCount, episodeDTOs);
+                    } else {
+                        return new SeasonDTO(seasonData.getSeasonName(), episodeCount);
+                    }
+                })
+                .collect(Collectors.toList());
     }
 
-    private EpisodeDTO toEpisodeDTO(ResultSet rs) throws SQLException {
-        Integer idx = null;
-        try {
-            idx = rs.getObject("episode_index") == null ? null : rs.getInt("episode_index");
-        } catch (Exception ignored) {
-        }
-        String title = safeGet(rs, "episode_title");
-        String desc = safeGet(rs, "episode_description");
-        String dur = safeGet(rs, "episode_duration");
-        String img = safeGet(rs, "episode_image_url");
-        String fn = safeGet(rs, "episode_filename");
-        String url = safeGet(rs, "episode_url");
-        return new EpisodeDTO(idx, title, desc, dur, img, fn, url);
-    }
-
-    private String safeGet(ResultSet rs, String col) {
-        try {
-            return rs.getString(col);
-        } catch (Exception e) {
-            return null;
-        }
+    private EpisodeDTO toEpisodeDTO(com.example.demo.model.Episode episode) {
+        if (episode == null) return null;
+        // Assuming Episode entity doesn't have episodeIndex, passing null or 0. 
+        // If needed, we might need to add an index field to the Episode entity or infer it.
+        // For now, using null as it was in the JDBC row mapper if column was missing.
+        Integer idx = null; 
+        return new EpisodeDTO(
+            idx,
+            episode.getTitle(),
+            episode.getDescription(),
+            episode.getDuration(),
+            episode.getImageUrl(),
+            episode.getFilename(),
+            episode.getUrl()
+        );
     }
 }

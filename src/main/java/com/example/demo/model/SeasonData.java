@@ -24,7 +24,7 @@ public class SeasonData {
 
     private String seasonName;
 
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "season_data_id")
     private List<Episode> episodes;
 

@@ -24,18 +24,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+                // PUBLIC endpoints
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/shows/all").permitAll() // Explicitly permit all for /api/shows/all
                 .requestMatchers("/api/shows/**").permitAll()
+                // everything under /api/user/** requires auth
                 .requestMatchers("/api/user/**").authenticated()
-                .anyRequest().denyAll())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // deny anything else explicitly
+                .anyRequest().denyAll()
+            )
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider)
+            // ensure JWT filter runs but will skip public endpoints via shouldNotFilter
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-
 }

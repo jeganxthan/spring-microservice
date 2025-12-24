@@ -75,7 +75,7 @@ public class Show {
     @JsonProperty("Poster")
     private String poster;
 
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "show_title")
     private List<SeasonData> seasons_data;
 
